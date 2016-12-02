@@ -1,0 +1,71 @@
+<tool id="stategraems_push" name="Save files in STATegra EMS" version="0.1" workflow_compatible="false">
+	<description>Automatically annotate and save your Galaxy history files in STATegra EMS.</description>
+	<requirements>
+		<requirement type="package">requests</requirement>
+	</requirements>
+
+	<command interpreter="python">
+		##------------------------------------------------------------------------------------
+		## Main body of the tool
+		##------------------------------------------------------------------------------------
+	</command>
+
+	<inputs>
+		<section name="emsoptions" title="STATegra EMS Options" expanded="True">
+			<param name="emshost" type="text" value="" label="STATegra EMS Host" />
+			<param name="emsuser" type="text" value="" label="Username:" />
+			<param name="emssession" type="text" value="" label="Session token:" />
+			<!--<param name="emspass" type="text" value="" label="Password:" />-->
+			<param name="emsexperiment" type="text" value="" label="Experiment ID:" />
+		</section>
+		<section name="fileselection" title="File selection" multiple="true" expanded="True">
+			<param format="data" name="selectedFiles" type="data" label="File(s) to annotate:" />
+			<conditional name="upload_option">
+				<param type="select" display="radio" name="uploadFiles" label="Upload the files? [see help for more information]: ">
+					<option value="not_upload">Just send the files description. Do not upload the files.</option>
+					<option value="upload">Upload both annotation and the files to STATegra EMS.</option>
+				</param>
+				<when value="upload">
+					<conditional name="upload_selection">
+						<param type="select" display="radio" name="uploadSelection" label="Please choose the files to upload [see help for more information]: ">
+							<option value="upload_all">All selected files.</option>
+							<option value="upload_custom">Let me choose.</option>
+						</param>
+						<when value="upload_custom">
+							<param format="data" name="uploadFilesSelected" type="data" multiple="true" label="File(s) to upload:" />
+						</when>
+					</conditional>
+				</when>
+			</conditional>
+		</section>
+	</inputs>
+
+	<outputs>
+		<data name="output" label="${tool.name}: ${customName}" auto_format="true" />
+	</outputs>
+
+	<help>
+=================
+Send to STATegra EMS
+=================
+
+**What it does**
+
+Use this tool to automatically annotate your current history in a STATegra EMS instance.
+The tool generates the *file provenance* for each selected file based on the current history and sends it to STATegra EMS, which will create a new Analysis instance associated to the selected Experiment.
+This Analysis instance will describe the complete process followed to generate the selected files.
+In addition, files can be stored in the corresponding Experiment data directory.
+--------
+
+**How to use**
+
+TODO
+
+-----
+
+**Author**: Rafael Hernández de Diego [SLU Global Bioinformatics Centre]
+
+Sources are available at https://github.com/fikipollo/stategraems-galaxy
+
+	</help>
+</tool>
