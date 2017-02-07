@@ -47,7 +47,7 @@
 		##------------------------------------------------------------------------------------
 		## This function creates a new instance of an Input object that will be added to a
 		## job instance
-		## https://docs.galaxyproject.org/en/master/_modules/galaxy/model.html#DatasetInstance
+		## http://galaxy.readthedocs.io/en/master/_modules/galaxy/model.html#Dataset
 		##------------------------------------------------------------------------------------
 		#def createInputInstance($jda)
 			#set $instance = {}
@@ -55,8 +55,6 @@
 				#set $instance["name"] = str($jda.name)
 				#set $instance["id"] = str($__app__.security.encode_id($jda.dataset.id))
 				#set $instance["file"] = str($jda.dataset.name)
-				#set $instance["external_filename"] = str($jda.dataset.dataset.external_filename)
-				#set $instance["file_size"] = str($jda.dataset.dataset.file_size)
 			#end if
 			#return $instance
 		#end def
@@ -71,8 +69,6 @@
 				#set $instance["name"] = str($jda.name)
 				#set $instance["id"] = str($__app__.security.encode_id($jda.dataset.id))
 				#set $instance["file"] = str($jda.dataset.name)
-				#set $instance["external_filename"] = str($jda.dataset.dataset.external_filename)
-				#set $instance["file_size"] = str($jda.dataset.dataset.file_size)
 			#end if
 			#return $instance
 		#end def
@@ -124,7 +120,7 @@
 
 		##------------------------------------------------------------------------------------
 		## This function creates a new instance of Job.
-		## https://docs.galaxyproject.org/en/master/_modules/galaxy/model.html#Job
+		## http://galaxy.readthedocs.io/en/master/_modules/galaxy/model.html#Job
 		##------------------------------------------------------------------------------------
 		#def createJobInstance($job)
 			#set $instance = {}
@@ -194,30 +190,14 @@
 		#set params["emsexperimentid"] = str($emsexperimentid)
 		##3. The history ID
 		#set params["history_id"] = $__app__.security.encode_id($output.history.id)
-		##4. The selected dataset ids
-		#set params["dataset_id"] = []
-		$params["dataset_id"].append($__app__.security.encode_id('%s' % $selectedFiles.id))
-		#for $otherFile in $otherFiles
-			$params["dataset_id"].append($__app__.security.encode_id('%s' % $otherFile.selectedFile2.id))
-		#end for
+		##4. The selected dataset id
+		#set params["dataset_id"] = $__app__.security.encode_id('%s' % $fileselection.selectedFiles.id)
 		##5. The selected dataset name
-		#set params["dataset_name"] = []
-		$params["dataset_name"].append(str($selectedFiles.name))
-		#for $otherFile in $otherFiles
-			$params["dataset_name"].append(str($otherFile.selectedFile2.name))
-		#end for
+		#set params["dataset_name"] = str($fileselection.selectedFiles.name)
 		##6. The selected dataset file name
-		#set params["file_name"] = []
-		$params["file_name"].append(str($selectedFiles.file_name))
-		#for $otherFile in $otherFiles
-			$params["file_name"].append(str($otherFile.selectedFile2.file_name))
-		#end for
-		##7. Upload or not the files
-		#if $upload_option.uploadFiles == "upload"
-			#set params["upload_option"] = str($upload_option.whichFiles)
-		#else
-			#set params["upload_option"] = "none"
-		#end if
+		#set params["file_name"] = str($fileselection.selectedFiles.file_name)
+		##7. The selected dataset file format
+		#set params["file_format"] = str($output.ext)
 		##8. The output file dir for the job
 		#set params["output_dir"] = str($output.files_path)
 		##9. Current Galaxy user
@@ -235,28 +215,32 @@
 
 	<inputs>
 		<param name="emshost" type="text" value="172.17.0.1:8084" label="STATegra EMS Host" />
-		<param name="emsuser" type="text" value="ZWJpb2tpdEBnbWFpbC5jb206M2ZlZjBhMGU2MWNmOWU1YQ==" label="API code:" />
+		<param name="emsuser" type="text" value="admin" label="Username:" />
 		<param name="emsexperimentid" type="text" value="EXP00001" label="Experiment identifier:" />
 		<param name="emsanalysisname" type="text" value="My analysis" label="New analysis name:" />
-		<param format="data" name="selectedFiles" type="data" label="File(s) to annotate:" />
-		<repeat name="otherFiles" title="More files:">
-				<param name="selectedFile2" type="data" multiple="false" label="File to annotate:" />
-		</repeat>
-		<conditional name="upload_option">
-			<param type="select" display="radio" name="uploadFiles" label="Upload the files? [see help for more information]: ">
-				<option value="not_upload">Just send the files description. Do NOT upload the files.</option>
-				<option value="upload">Send the description AND the files to STATegra EMS.</option>
-			</param>
-			<when value="upload">
-				<param type="select" display="radio" name="whichFiles" label="Which files do you want to upload? [see help for more information]: ">
-					<option value="selected">Upload only the selected files.</option>
-					<option value="all">Upload all files, including selected and intermediate files.</option>
+		<section name="fileselection" title="File selection" multiple="true" expanded="True">
+			<param format="data" name="selectedFiles" type="data" label="File(s) to annotate:" />
+			<conditional name="upload_option">
+				<param type="select" display="radio" name="uploadFiles" label="Upload the files? [see help for more information]: ">
+					<option value="not_upload">Just send the files description. Do not upload the files.</option>
+					<option value="upload">Send the description and the files to STATegra EMS.</option>
 				</param>
-			</when>
-		</conditional>
+				<when value="upload">
+					<conditional name="upload_selection">
+						<param type="select" display="radio" name="uploadSelection" label="Please choose the files to upload [see help for more information]: ">
+							<option value="upload_all">All selected files.</option>
+							<option value="upload_custom">Let me choose.</option>
+						</param>
+						<when value="upload_custom">
+							<param format="data" name="uploadFilesSelected" type="data" multiple="true" label="File(s) to upload:" />
+						</when>
+					</conditional>
+				</when>
+			</conditional>
+		</section>
 	</inputs>
 	<outputs>
-		<data name="output" format="html"  />
+		<data name="output" label="${tool.name}: ${fileselection.selectedFiles.file_name}" auto_format="true" />
 	</outputs>
 
 	<help>
