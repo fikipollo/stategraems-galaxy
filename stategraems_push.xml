@@ -1,4 +1,4 @@
-<tool id="stategraems_push" name="Save files in STATegra EMS" version="0.1" workflow_compatible="false">
+<tool id="stategraems_push" name="Save files in STATegra EMS" version="0.2" workflow_compatible="true">
 	<description>Automatically annotate and save your Galaxy history files in STATegra EMS.</description>
 	<requirements>
 		<requirement type="package">requests</requirement>
@@ -71,8 +71,10 @@
 				#set $instance["name"] = str($jda.name)
 				#set $instance["id"] = str($__app__.security.encode_id($jda.dataset.id))
 				#set $instance["file"] = str($jda.dataset.name)
+				#set $instance["file_name"] = str($jda.dataset.dataset.get_file_name())
 				#set $instance["external_filename"] = str($jda.dataset.dataset.external_filename)
 				#set $instance["file_size"] = str($jda.dataset.dataset.file_size)
+				#set $instance["extension"] = str($jda.dataset.extension)
 			#end if
 			#return $instance
 		#end def
@@ -162,7 +164,7 @@
 		## Main body of the tool
 		##------------------------------------------------------------------------------------
 		## First we process the current history and get a table with the metadata for each job
-		#set global $history = $output.creating_job.history
+		#set global $history = $out_file1.creating_job.history
 		#set global $use_deleted = True
 		#set global $use_hidden = True
 
@@ -177,7 +179,7 @@
 		## Now we export the table to a string
 		#set $job_table={}
 		#for $job_id, $job in $job_associations.iteritems()
-			#if $job_id != $output.creating_job.id
+			#if $job_id != $out_file1.creating_job.id
 				#set $job_table[str($job_id)] = $createJobInstance($job)
 			#end if
 		#end for
@@ -185,47 +187,38 @@
 		## Set the params for the next Python script
 		#set params={}
 		##1. STATegra EMS host
-		#set params["emshost"] = str($emshost)
+		#set params["ems_host"] = str($emshost)
 		##2. STATegra EMS user
-		#set params["emsuser"] = str($emsuser)
-		##10. New analysis name
-		#set params["emsanalysisname"] = str($emsanalysisname)
-		##11. New experiment id
-		#set params["emsexperimentid"] = str($emsexperimentid)
-		##3. The history ID
-		#set params["history_id"] = $__app__.security.encode_id($output.history.id)
-		##4. The selected dataset ids
-		#set params["dataset_id"] = []
-		$params["dataset_id"].append($__app__.security.encode_id('%s' % $selectedFiles.id))
+		#set params["ems_api_code"] = str($emsapicode)
+		##3. New analysis name
+		#set params["ems_analysis_name"] = str($emsanalysisname)
+		##4. New experiment id
+		#set params["ems_experiment_id"] = str($emsexperimentid)
+		##5. The selected dataset ids
+		#set params["selected_dataset_id"] = []
+		$params["selected_dataset_id"].append($__app__.security.encode_id('%s' % $selectedFiles.id))
 		#for $otherFile in $otherFiles
-			$params["dataset_id"].append($__app__.security.encode_id('%s' % $otherFile.selectedFile2.id))
+			$params["selected_dataset_id"].append($__app__.security.encode_id('%s' % $otherFile.selectedFile2.id))
 		#end for
-		##5. The selected dataset name
-		#set params["dataset_name"] = []
-		$params["dataset_name"].append(str($selectedFiles.name))
-		#for $otherFile in $otherFiles
-			$params["dataset_name"].append(str($otherFile.selectedFile2.name))
-		#end for
-		##6. The selected dataset file name
-		#set params["file_name"] = []
-		$params["file_name"].append(str($selectedFiles.file_name))
-		#for $otherFile in $otherFiles
-			$params["file_name"].append(str($otherFile.selectedFile2.file_name))
-		#end for
-		##7. Upload or not the files
+		##6. Upload or not the files
 		#if $upload_option.uploadFiles == "upload"
 			#set params["upload_option"] = str($upload_option.whichFiles)
 		#else
 			#set params["upload_option"] = "none"
 		#end if
-		##8. The output file dir for the job
-		#set params["output_dir"] = str($output.files_path)
-		##9. Current Galaxy user
+		##7. Current Galaxy user
 		#set params["user_name"] = str($__user_name__)
+		##8. The history ID
+		#set params["history_id"] = $__app__.security.encode_id($out_file1.history.id)
+		##9. The working dir for the job
+		#set params["job_working_dir"] = str($out_file1.files_path)
+		##10. The output file for the job
+		#set params["output_file"] = str($out_file1)
+
 
 
 		#import json
-		#set $file=open($params["output_dir"] + '.tmp', 'w+')
+		#set $file=open($params["job_working_dir"] + '.tmp', 'w+')
 		$file.write(json.dumps($job_table))
 		#set $params=json.dumps($params)
 
@@ -234,13 +227,13 @@
 	</command>
 
 	<inputs>
-		<param name="emshost" type="text" value="172.17.0.1:8084" label="STATegra EMS Host" />
-		<param name="emsuser" type="text" value="ZWJpb2tpdEBnbWFpbC5jb206M2ZlZjBhMGU2MWNmOWU1YQ==" label="API code:" />
-		<param name="emsexperimentid" type="text" value="EXP00001" label="Experiment identifier:" />
-		<param name="emsanalysisname" type="text" value="My analysis" label="New analysis name:" />
-		<param format="data" name="selectedFiles" type="data" label="File(s) to annotate:" />
+		<param name="emshost" type="text" value="" label="STATegra EMS Host" help="A valid URL to your STATegra EMS host (e.g. http://bioinfo.cipf.es/stategraems)"/>
+		<param name="emsapicode" type="text" value="" label="API code:" help="Your API code for STATegraEMS (more info http://stategraems.readthedocs.io/en/latest/tutorials/api/)"/>
+		<param name="emsexperimentid" type="text" value="EXP00001" label="Study identifier:" help="A valid identifier for a study in the STATegra EMS (e.g. EXP00001)" />
+		<param name="emsanalysisname" type="text" value="My analysis" label="New analysis name:"  help="The name for the new analysis in the STATegra EMS (e.g. My awesome RNA-seq analysis)"/>
+		<param format="data" name="selectedFiles" type="data" label="Dataset(s) to annotate:" help="Choose all the datasets in the history that will be annotated as part as the new analysis"/>
 		<repeat name="otherFiles" title="More files:">
-				<param name="selectedFile2" type="data" multiple="false" label="File to annotate:" />
+				<param name="selectedFile2" type="data" multiple="false" label="Dataset to annotate:"/>
 		</repeat>
 		<conditional name="upload_option">
 			<param type="select" display="radio" name="uploadFiles" label="Upload the files? [see help for more information]: ">
@@ -256,7 +249,7 @@
 		</conditional>
 	</inputs>
 	<outputs>
-		<data name="output" format="html"  />
+		<data name="out_file1" format="html" file="output.html" />
 	</outputs>
 
 	<help>
@@ -266,15 +259,30 @@ Send to STATegra EMS
 
 **What it does**
 
-Use this tool to automatically annotate your current history in a STATegra EMS instance.
-The tool generates the *file provenance* for each selected file based on the current history and sends it to STATegra EMS, which will create a new Analysis instance associated to the selected Experiment.
+Use this tool to automatically annotate your current history in your STATegra EMS instance.
+The tool obtains the *file provenance* for each selected file based on the current history and sends it to the STATegra EMS, where a new Analysis instance is created associated to the selected Study.
 This Analysis instance will describe the complete process followed to generate the selected files.
-In addition, files can be stored in the corresponding Experiment data directory.
---------
+Additionally, the resulting files can be stored in the data directory for the selected study.
+
+----
 
 **How to use**
 
-TODO
+1. Write a valid *URL* to your STATegra EMS host (e.g. http://bioinfo.cipf.es/stategraems)
+2. Sign in your STATegra EMS and copy your *API code* (more info http://stategraems.readthedocs.io/en/latest/tutorials/api/)
+3. Enter your API code in the form.
+4. Type the a valid identifier for a *study* in the STATegra EMS (you must be a valid member of the study, e.g. "EXP00001").
+5. Enter a name for the new analysis that will be created in the STATegra EMS (e.g. "My awesome RNA-seq analysis").
+6. Choose all the datasets in the history that will be annotated as part as the new analysis.
+7. Choose whether you want to send just the description of the datasets generation, or upload the metadata and the generated datasets.
+
+.. class:: infomark
+
+'''TIP''' *Note* that this tool will automatically select all the datasets that are involved in the generation of the selected datasets.
+
+.. class:: infomark
+
+'''TIP''' *Note* that file uploading can fail due to restrictions in file sizes in the STATegra EMS instance.
 
 -----
 
@@ -283,4 +291,14 @@ TODO
 Sources are available at https://github.com/fikipollo/stategraems-galaxy
 
 	</help>
+	<citations>
+   <citation type="bibtex">@ARTICLE{Hernandez2014,
+   author = {Hernandez-de-Diego, R.  and Boix-Chova, N.  and Gomez-Cabrero, D.  and Tegner, J.  and Abugessaisa, I.  and Conesa, A.},
+   title = {{S}{T}{A}{T}egra {E}{M}{S}: an {E}xperiment {M}anagement {S}ystem for complex next-generation omics experiments},
+   journal = {BMC Syst Biol},
+   year = {2014},
+   volume = {8 Suppl 2},
+   pages = {S9}
+   }</citation>
+ </citations>
 </tool>

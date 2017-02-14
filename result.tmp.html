@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.3/jquery.min.js"></script>
+	<script type="text/javascript" src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+	<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+	<div class="panel" style="padding: 30px 50px;">
+		<h1>Save files in STATegra EMS</h1>
+		<div class="panel">
+			<h2>1. Analysis registration</h2>
+			<div class="well well-md">
+				$analysis_registration_status_title
+				$analysis_registration_status_message
+			</div>
+			<table style="width: 800px;margin: auto;font-size: 18px;" class="table table-striped">
+				<tbody>
+					<tr>
+						<td style="width: 150px;"><b>Analysis name:</b></td>
+						<td>$analysis_registration_name</td>
+					</tr>
+					<tr>
+						<td style="width: 150px;"><b>Analysis ID:</b></td>
+						<td>$analysis_registration_id</td>
+					</tr>
+					<tr>
+						<td style="width: 150px;"><b>Link:</b></td>
+						<td>$analysis_registration_link</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		<div class="panel">
+			<h2>2. File submission</h2>
+			<div class="well well-md">
+				$submission_status_title
+				$submission_status_message
+			</div>
+			<table style="width: 800px;margin: auto;font-size: 18px;" class="table table-striped">
+				<tbody>
+					<tr><th><b>Uploaded files</b></th></tr>
+					$submission_files_list
+				</tbody>
+			</table>
+		</div>
+	</div>
+</body>
+</html>

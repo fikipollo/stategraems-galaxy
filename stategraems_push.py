@@ -26,7 +26,7 @@
       Rafa Hernandez de Diego <https://github.com/fikipollo>
       Tomas Klingstrom
       Erik Bongcam-Rudloff
-	  Ana Conesa Cegarra
+      Ana Conesa Cegarra
       and others.
 
 	  A Galaxy tool to store files in an external STATegra EMS server.
@@ -44,97 +44,133 @@ def main():
 	The accepted params are:
 	 -- sys.argv[0] is the python script
 	 -- sys.argv[1] is a JSON-like string containing the params for the script
-		  1. emshost, the STATegra EMS host
-		  2. emsuser, the STATegra EMS user
-		  3. history_id, the current history identifier
-		  4. dataset_id, the identifiers for the selected datasets
-		  5. dataset_name, the names for the selected datasets
-		  6. file_name, the file names for the selected datasets
-		  7. upload_option, whether files should be uploaded or not to server
-		  8. output_dir, the dir for the output files for current job
-		  9. user_name, current Galaxy username
-		 10. emsanalysisname, the name for the new analysis
-		 11. emsexperimentid, the ID for the experiment
+		  1. ems_host, the STATegra EMS host
+		  2. ems_api_code, the STATegra EMS user API code
+		  3. ems_analysis_name, the name for the new analysis
+		  4. ems_experiment_id, the ID for the experiment
+		  5. selected_dataset_id, the identifiers for the selected datasets
+		  6. upload_option, whether files should be uploaded or not to server
+		  7. user_name, current Galaxy username
+		  8. history_id, the current history identifier
+		  9. job_working_dir, the working dir for the current job
+		 10. output_file, the output file for the job
 	 -- sys.argv[2] is the current Galaxy history in JSON-like format
 	"""
+
 	#STEP 1. Read the params
 	params = json.loads(sys.argv[1])
-	with open(params["output_dir"] + '.tmp') as data_file:
+	with open(params["job_working_dir"] + '.tmp') as data_file:
 	    history_json = json.load(data_file)
 
-	#STEP 2. COMPLETE THE METADATA FOR THE FILE USING THE GALAXY API
-	# 2.a. FROM INPUT PARAMS
-	metadata = {
-		"history_id" : params["history_id"],
-		"dataset_id" : params["dataset_id"],
-		"galaxy_username"  : params["user_name"],
-		"origin"  : "galaxy",
-		"apicode"  : params["emsuser"],
-		"emsanalysisname"  : params["emsanalysisname"],
-		"experiment_id"  : params["emsexperimentid"]
+	#PREPARE THE PARAMS FOR THE OUTPUT FILE
+	output_params = {
+		'analysis_registration_status_title' : "",
+		'analysis_registration_status_message' : "",
+		'analysis_registration_name' : params['ems_analysis_name'],
+		'analysis_registration_id' : "",
+		'analysis_registration_link' : "",
+		'submission_status_title' : "<h3>No files were submitted</h3>",
+		'submission_status_message' : "",
+		'submission_files_list' : ""
 	}
 
-	# 2.b. GENERATE THE PROVENANCE FOR THE FILE BASED ON THE HISTORY
-	datasets_table = {}
-	provenance_list = []
-	already_added = {}
-	selected_jobs = []
-	#   2.b.i. Process the history data and generate the table output dataset -> job id
-	#          and get the jobs that produces the selected datasets
-	for job_id, job_instance in history_json.iteritems():
-		for output_item in job_instance["outputs"]:
-			datasets_table[output_item["id"]] = job_instance
-			if output_item["id"] in metadata["dataset_id"]:
-				selected_jobs.append(job_instance)
+	try:
 
-	#   2.b.ii. Get the provenance for each origin job
-	for selected_job in selected_jobs:
-		provenance_list = generateProvenance(selected_job, datasets_table, provenance_list, already_added)
-	metadata["provenance"] = json.dumps(provenance_list);
+		#STEP 2. COMPLETE THE METADATA FOR THE FILE USING THE GALAXY API
+		# 2.a. FROM INPUT PARAMS
+		metadata = {
+			"history_id" : params["history_id"],
+			"selected_dataset_id" : params["selected_dataset_id"],
+			"galaxy_username"  : params["user_name"],
+			"origin"  : "galaxy",
+			"apicode"  : params["ems_api_code"],
+			"ems_analysis_name"  : params["ems_analysis_name"],
+			"experiment_id"  : params["ems_experiment_id"]
+		}
 
-	#STEP 3. UPLOAD THE PROVENANCE USING THE request lib
-	if not(params["emshost"].startswith("http://") or params["emshost"].startswith("https://")):
-		params["emshost"] = "http://" + params["emshost"]
-	params["emshost"] = params["emshost"].rstrip("/")
+		# 2.b. GENERATE THE PROVENANCE FOR THE FILE BASED ON THE HISTORY
+		datasets_table = {}
+		provenance_list = []
+		already_added = {}
+		selected_jobs = []
+		#   2.b.i. Process the history data and generate the table output dataset -> job id
+		#          and get the jobs that produces the selected datasets
+		for job_id, job_instance in history_json.iteritems():
+			for output_item in job_instance["outputs"]:
+				datasets_table[output_item["id"]] = job_instance
+				if output_item["id"] in metadata["selected_dataset_id"]:
+					selected_jobs.append(job_instance)
 
-	print "Sending provenance for datasets " + str(params["dataset_id"]) + " to EMS server " + params["emshost"] + " with user " + params["emsuser"]
-	url = params["emshost"] + "/rest/analysis/import"
-	headers = {'content-type': 'application/json'}
-	response = requests.post(url, data=json.dumps(metadata), headers=headers)
+		#   2.b.ii. Get the provenance for each origin job
+		for selected_job in selected_jobs:
+			provenance_list = generateProvenance(selected_job, datasets_table, provenance_list, already_added)
+		metadata["provenance"] = json.dumps(provenance_list);
 
-	if(response.status_code != 200):
-		print "Failed!"
-		stop_err(response.status_code, response.text)
+		#STEP 3. UPLOAD THE PROVENANCE USING THE request lib
+		if not(params["ems_host"].startswith("http://") or params["ems_host"].startswith("https://")):
+			params["ems_host"] = "http://" + params["ems_host"]
+		params["ems_host"] = params["ems_host"].rstrip("/")
 
-	response = response.json()
-	analysis_id = response.get("newID")
-	print "Success! New Analysis is " + analysis_id
+		print "Registering a new analysis..."
+		url = params["ems_host"] + "/rest/analysis/import"
+		headers = {'content-type': 'application/json'}
+		response = requests.post(url, data=json.dumps(metadata), headers=headers)
 
-	#STEP 4. UPLOAD THE FILES USING THE request lib
-	if params["upload_option"] != "none":
-		if params["upload_option"] == "all":
-			jobs = already_added.values()
+		if(response.status_code != 200):
+			print "Failed!"
+			raise Exception(response.text)
 		else:
-			jobs = selected_jobs
+			response = response.json()
+			analysis_id = response.get("newID")
+			print "Success!"
+			print "The ID for the new Analysis is " + analysis_id
+			output_params["analysis_registration_status_title"] = '<h3 class="text-success"><span class="glyphicon glyphicon-ok-sign"></span> Success</h3>'
+			output_params["analysis_registration_status_message"] = 'A new analysis has been successfully created in the selected STATegra EMS instance.'
+			output_params["analysis_registration_id"] = analysis_id
+			output_params["analysis_registration_link"] = '<a href="' + params["ems_host"] + "/#/analysis" + '" target="_blank"> Show in STATegra EMS</a>'
 
-		for job in jobs:
-			#FOR EACH OUTPUT external_filename -> TEST AND UPLOAD
-			#AQUIIIIIII
-			print "Sending file " + str(file) + " to EMS server " + params["emshost"] + " with user " + params["emsuser"]
-			files = {'upload_file': open(str(file),'rb')}
-			url = params["emshost"] + "/rest/files/"
-			response = requests.post(url, files=files, params={'experiment_id' : params['emsexperimentid'], 'parent_dir': analysis_id, 'apicode' : params["emsuser"]})
+		#STEP 4. UPLOAD THE FILES USING THE request lib
+		errors = []
+		print "Uploading files..."
+		if params["upload_option"] == "none":
+			print "No files were uploaded"
+		else:
+			if params["upload_option"] == "all":
+				jobs = already_added.values()
+			else:
+				jobs = selected_jobs
 
-			if(response.status_code != 200):
-				#TODO: NOT FAIL OR THINK WHAT TO DO
-				print "Failed!"
-				stop_err(response.status_code, response.text)
+			for job in jobs:
+				#FOR EACH OUTPUT external_filename -> TEST AND UPLOAD
+				for file in job["outputs"]:
+					file_name = file["file"].replace(" ", "_") + "." + file["extension"]
+					print " - " + str(file_name)
+					files = {'upload_file': open(str(file["file_name"]),'rb')}
+					url = params["ems_host"] + "/rest/files/"
+					response = requests.post(url, files=files, params={'file_name' : file_name, 'experiment_id' : params['ems_experiment_id'], 'parent_dir': analysis_id, 'apicode' : params["ems_api_code"]})
 
-	output=open(params["output_dir"], 'w+')
-	output.write('<html><head></head><body>')
-	output.write('<h1>This is a test</h1>')
-	output.write('</body></html>')
-	output.close()
+					if(response.status_code != 200):
+						print "   FAILED"
+						errors.append('<li>Failed while uploading the file "' + file_name + '", the file was not uploaded.</li>')
+					else:
+						print "   OK"
+						output_params["submission_files_list"] += '<tr><td>' + file_name + '</tr></td>'
+
+			if len(errors) > 0:
+				print "Errors detected, please check output for details."
+				output_params["submission_status_title"] = '<h3 class="text-warning"><span class="glyphicon glyphicon-info-sign"></span> Errors detected</h3>'
+				output_params["submission_status_message"] = '<p>Some errors were detected while uploading files</p><ul>' + "\n".join(errors) + '</ul>'
+			else:
+				output_params["submission_status_title"] = '<h3 class="text-success"><span class="glyphicon glyphicon-ok-sign"></span> Success</h3>'
+				output_params["submission_status_message"] = '<p>All files were uploaded successfully.</p>'
+
+		generateOutputFile(params["output_file"], output_params)
+
+	except Exception as e:
+		output_params["analysis_registration_status_title"] = '<h3 class="text-danger"><span class="glyphicon glyphicon-remove-sign"></span> Failed</h3>'
+		output_params["analysis_registration_status_message"] = 'Error message: ' + str(e)
+		generateOutputFile(params["output_file"], output_params)
+		stop_err(str(e))
 
 	return True
 
@@ -146,7 +182,7 @@ def generateProvenance(job_instance, datasets_table, provenance_list, already_ad
 	"""
 	#if not in provenance_list --> push
 	if not job_instance["id"] in already_added:
-		already_added[job_instance["id"]] = 1
+		already_added[job_instance["id"]] = job_instance
 		provenance_list.append(job_instance)
 
 	#Get the input files
@@ -157,8 +193,24 @@ def generateProvenance(job_instance, datasets_table, provenance_list, already_ad
 
 	return provenance_list
 
-def stop_err( error_code, msg ):
-    sys.stderr.write( "%s\n" % error_code )
+def generateOutputFile(output_file, output_params):
+	import os
+	path = os.path.realpath(__file__)
+	path = os.path.dirname(path)
+
+	from string import Template
+	#open the file
+	template = open(path + '/result.tmp.html')
+	#read it
+	src = Template( template.read() )
+	#do the substitution
+	result = src.substitute(output_params)
+	#Save the content to the output file
+	output=open(output_file, 'w+')
+	output.write(result)
+	output.close()
+
+def stop_err(msg):
     sys.stderr.write( "%s\n" % msg )
     sys.exit()
 
