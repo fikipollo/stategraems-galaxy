@@ -32,14 +32,14 @@
 		## based on the collection of datasets used as input or output for the jobs.
 		##------------------------------------------------------------------------------------
 		#def findJobAssociations_HistoryDatasetCollection_rec($dataset_coll, $job_associations)
-			#for $dataset in $dataset_coll.elements
+			#for $dataset in $dataset_coll.collection.elements
 				#if $dataset.hda
 					$findJobAssociations_HistoryDataset($dataset.hda, $job_associations)
 				##elif $dataset.ldda
 					##		#TODO
 					##		$enum_LibraryDatasetAssociation($dataset.ldda, $job_associations)
-				#elif $dataset.child_collection
-					$findJobAssociations_HistoryDatasetCollection_rec($dataset.child_collection, $job_associations)
+				###elif $dataset.child_collection
+				##	$findJobAssociations_HistoryDatasetCollection_rec($dataset.child_collection, $job_associations)
 				#end if
 			#end for
 		#end def
@@ -160,6 +160,19 @@
 			#return $instance
 		#end def
 
+		#def getSelectedDatasets($selectedFiles)
+			#set $result = []
+			## If input is a data collection
+			#if isinstance($selectedFiles, list):
+				## For each dataset
+				#for $dataset in $selectedFiles:
+					$result.append($__app__.security.encode_id('%s' % $dataset.id))
+				#end for
+			#else:
+				$result.append($__app__.security.encode_id('%s' % $dataset.dataset.id))
+			#end if
+			#return $result
+		#end def
 		##------------------------------------------------------------------------------------
 		## Main body of the tool
 		##------------------------------------------------------------------------------------
@@ -195,11 +208,7 @@
 		##4. New experiment id
 		#set params["ems_experiment_id"] = str($emsexperimentid)
 		##5. The selected dataset ids
-		#set params["selected_dataset_id"] = []
-		$params["selected_dataset_id"].append($__app__.security.encode_id('%s' % $selectedFiles.id))
-		#for $otherFile in $otherFiles
-			$params["selected_dataset_id"].append($__app__.security.encode_id('%s' % $otherFile.selectedFile2.id))
-		#end for
+		#set params["selected_dataset_id"] = $getSelectedDatasets($selectedFiles)
 		##6. Upload or not the files
 		#if $upload_option.uploadFiles == "upload"
 			#set params["upload_option"] = str($upload_option.whichFiles)
@@ -214,7 +223,8 @@
 		#set params["job_working_dir"] = str($out_file1.files_path)
 		##10. The output file for the job
 		#set params["output_file"] = str($out_file1)
-
+		##10. REMOVE ME
+		###set params["job_table"] = json.dumps($job_table)
 
 
 		#import json
@@ -231,10 +241,7 @@
 		<param name="emsapicode" type="text" value="" label="API code:" help="Your API code for STATegraEMS (more info http://stategraems.readthedocs.io/en/latest/tutorials/api/)"/>
 		<param name="emsexperimentid" type="text" value="EXP00001" label="Study identifier:" help="A valid identifier for a study in the STATegra EMS (e.g. EXP00001)" />
 		<param name="emsanalysisname" type="text" value="My analysis" label="New analysis name:"  help="The name for the new analysis in the STATegra EMS (e.g. My awesome RNA-seq analysis)"/>
-		<param format="data" name="selectedFiles" type="data" label="Dataset(s) to annotate:" help="Choose all the datasets in the history that will be annotated as part as the new analysis"/>
-		<repeat name="otherFiles" title="More files:">
-				<param name="selectedFile2" type="data" multiple="false" label="Dataset to annotate:"/>
-		</repeat>
+		<param format="data" name="selectedFiles" type="data" multiple="true" label="Dataset(s) to annotate:" help="Choose the datasets from the history that will be annotated as part as the new analysis (use control key for multiple selection). Note that all parent steps in the history will be selected automatically."/>
 		<conditional name="upload_option">
 			<param type="select" display="radio" name="uploadFiles" label="Upload the files? [see help for more information]: ">
 				<option value="not_upload">Just send the files description. Do NOT upload the files.</option>

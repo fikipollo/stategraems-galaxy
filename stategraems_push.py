@@ -189,6 +189,8 @@ def generateProvenance(job_instance, datasets_table, provenance_list, already_ad
 	#For each input file, get the origin job
 	for input_item in job_instance["inputs"]:
 		selected_job = datasets_table[input_item["id"]]
+		if "file" in input_item:
+			selected_job["step_name"] =  input_item["file"]
 		generateProvenance(selected_job, datasets_table, provenance_list, already_added)
 
 	return provenance_list
