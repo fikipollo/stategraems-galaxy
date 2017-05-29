@@ -145,16 +145,20 @@ def main():
 				for file in job["outputs"]:
 					file_name = file["file"].replace(" ", "_") + "." + file["extension"]
 					print " - " + str(file_name)
-					files = {'upload_file': open(str(file["file_name"]),'rb')}
-					url = params["ems_host"] + "/rest/files/"
-					response = requests.post(url, files=files, params={'file_name' : file_name, 'experiment_id' : params['ems_experiment_id'], 'parent_dir': analysis_id, 'apicode' : params["ems_api_code"]})
+					try:
+						files = {'upload_file': open(str(file["file_name"]),'rb')}
+						url = params["ems_host"] + "/rest/files/"
+						response = requests.post(url, files=files, params={'file_name' : file_name, 'experiment_id' : params['ems_experiment_id'], 'parent_dir': analysis_id, 'apicode' : params["ems_api_code"]})
 
-					if(response.status_code != 200):
+						if(response.status_code != 200):
+							print "   FAILED"
+							errors.append('<li>Failed while uploading the file "' + file_name + '", the file was not uploaded.</li>')
+						else:
+							print "   OK"
+							output_params["submission_files_list"] += '<tr><td>' + file_name + '</tr></td>'
+					except Exception as e:
 						print "   FAILED"
 						errors.append('<li>Failed while uploading the file "' + file_name + '", the file was not uploaded.</li>')
-					else:
-						print "   OK"
-						output_params["submission_files_list"] += '<tr><td>' + file_name + '</tr></td>'
 
 			if len(errors) > 0:
 				print "Errors detected, please check output for details."
@@ -187,11 +191,17 @@ def generateProvenance(job_instance, datasets_table, provenance_list, already_ad
 
 	#Get the input files
 	#For each input file, get the origin job
-	for input_item in job_instance["inputs"]:
-		selected_job = datasets_table[input_item["id"]]
-		if "file" in input_item:
-			selected_job["step_name"] =  input_item["file"]
-		generateProvenance(selected_job, datasets_table, provenance_list, already_added)
+	for i in reversed(range(len(job_instance["inputs"]))):
+		input_item = job_instance["inputs"][i]
+		if len(input_item) == 0: #Empty dict {}
+			del job_instance["inputs"][i]
+			continue
+
+		if "id" in input_item:
+			selected_job = datasets_table[input_item["id"]]
+			if "file" in input_item:
+				selected_job["step_name"] =  input_item["file"]
+			generateProvenance(selected_job, datasets_table, provenance_list, already_added)
 
 	return provenance_list
 
