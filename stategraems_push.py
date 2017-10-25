@@ -148,7 +148,7 @@ def main():
 					try:
 						files = {'upload_file': open(str(file["file_name"]),'rb')}
 						url = params["ems_host"] + "/rest/files/"
-						response = requests.post(url, files=files, params={'file_name' : file_name, 'experiment_id' : params['ems_experiment_id'], 'parent_dir': analysis_id, 'apicode' : params["ems_api_code"]})
+						response = requests.post(url, files=files, params={'file_name' : file_name, 'experiment_id' : params['ems_experiment_id'], 'parent_dir': params['ems_experiment_id'] + "/" + analysis_id, 'apicode' : params["ems_api_code"]})
 
 						if(response.status_code != 200):
 							print "   FAILED"
